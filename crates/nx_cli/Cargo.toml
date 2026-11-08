@@ -1,0 +1,11 @@
+[package]
+name = "nx_cli"
+version = "1.2.0"
+edition = "2021"
+
+[dependencies]
+nx_hal_fs = { path = "../nx_hal_fs" }
+nxc_lexer_parser = { path = "../nxc_lexer_parser" }
+bytemuck = { version = "1.18", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+gltf = "1.4"

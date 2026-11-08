@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d14">
+  <title>NativX Runtime Surface</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body { width: 100vw; height: 100vh; overflow: hidden; background: #0d0d14; touch-action: none; }
+    #nx-surface { width: 100vw; height: 100vh; display: block; outline: none; }
+    #nx-boot {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; background: #0d0d14;
+      color: #00f0ff; font-family: system-ui, monospace; gap: 16px; z-index: 10;
+    }
+    #nx-boot button {
+      padding: 12px 28px; background: #00f0ff; color: #0d0d14; border: none;
+      font-weight: 700; border-radius: 6px; cursor: pointer; font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div id="nx-boot">
+    <div id="nx-status">Inicializando bus WebGPU + Wasm...</div>
+    <button id="nx-start" hidden>INICIAR HARDWARE NATIVX</button>
+  </div>
+  <canvas id="nx-surface" tabindex="0"></canvas>
+  <script type="module" src="./nx_loader.js"></script>
+</body>
+</html>

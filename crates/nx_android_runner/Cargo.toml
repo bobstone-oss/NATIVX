@@ -1,0 +1,31 @@
+# Archivo: crates/nx_android_runner/Cargo.toml
+[package]
+name = "nativx_app"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "nativx_app"
+crate-type = ["cdylib"] # Genera libnativx_app.so para el APK
+
+[dependencies]
+nx_hal_gpu = { path = "../nx_hal_gpu" }
+nx_hal_sensors = { path = "../nx_hal_sensors" }
+winit = { version = "0.30", features = ["android-native-activity"] }
+ndk = { version = "0.9", features = ["all"] }
+ndk-sys = "0.6"
+pollster = "0.3"
+log = "0.4"
+android_logger = "0.14"
+
+# Metadatos automáticos para que `cargo apk` construya el APK con un solo comando
+[package.metadata.android]
+package = "com.nativx.runtime"
+apk_name = "nativx_odisea"
+assets = "../../assets"
+strip = "strip"
+build_targets = ["aarch64-linux-android"]
+
+[package.metadata.android.sdk]
+min_sdk_version = 29
+target_sdk_version = 35

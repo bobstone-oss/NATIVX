@@ -1,0 +1,288 @@
+# Archivo: .github/workflows/nativx_release.yml
+name: ⚡ NativX Multi-Platform Release Pipeline (Web + APK + IPA + Desktop)
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*.*.*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Permite ejecutar el pipeline manualmente con un botón en GitHub
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ============================================================================
+  # FASE 1: VERIFICACIÓN DEL COMPILADOR NXC, TESTS Y EMPAQUETADO .NXPAK
+  # ============================================================================
+  verify_and_pack_assets:
+    name: 🔍 1. Tests del Motor y Empaquetado (.nxpak)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar código fuente del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias de sistema para compilación gráfica (Vulkan / X11 / ALSA)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev
+
+      - name: Instalar Toolchain de Rust estable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Caché de compilación de Cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Ejecutar Suite de Pruebas Unitarias (nx_core, nxc_lexer_parser, nx_ecs, nx_cli)
+        run: |
+          cargo test -p nx_core
+          cargo test -p nxc_lexer_parser
+          cargo test -p nx_ecs
+          cargo test -p nx_cli
+
+      - name: Convertir activos de diseño y empaquetar contenedor Zero-Copy (game_data.nxpak)
+        run: |
+          mkdir -p dist
+          if [ -d "raw_assets" ]; then
+            cargo run -p nx_cli --release -- import raw_assets assets
+          else
+            cargo run -p nx_cli --release -- init-assets assets
+          fi
+          cargo run -p nx_cli --release -- pack assets dist/game_data.nxpak
+          cargo run -p nx_cli --release -- inspect dist/game_data.nxpak
+
+      - name: Subir artefacto universal game_data.nxpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: nativx-assets-pak
+          path: dist/game_data.nxpak
+
+  # ============================================================================
+  # FASE 2: COMPILACIÓN PARA NAVEGADOR WEB (WEBASSEMBLY + WEBGPU + COOP/COEP)
+  # ============================================================================
+  build_web_wasm:
+    name: 🌐 2. Compilar WebAssembly + WebGPU (.wasm)
+    needs: verify_and_pack_assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust con target wasm32-unknown-unknown
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Instalar Binaryen (wasm-opt) para reducción extrema de tamaño
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
+      - name: Descargar contenedor game_data.nxpak
+        uses: actions/download-artifact@v4
+        with:
+          name: nativx-assets-pak
+          path: dist/
+
+      - name: Compilar binario NativX Wasm y optimizar con wasm-opt -O4
+        run: |
+          cargo build -p nx_hal_sensors --target wasm32-unknown-unknown --release
+          wasm-opt -O4 --enable-simd --enable-bulk-memory \
+            target/wasm32-unknown-unknown/release/nx_hal_sensors.wasm \
+            -o dist/nativx_app.wasm
+
+      - name: Generar cabeceras COOP/COEP para SharedArrayBuffer en alojamientos estáticos
+        run: |
+          cat << 'EOF' > dist/_headers
+          /*
+            Cross-Origin-Opener-Policy: same-origin
+            Cross-Origin-Embedder-Policy: require-corp
+            Access-Control-Allow-Origin: *
+          EOF
+
+      - name: Subir paquete Web listo para producción
+        uses: actions/upload-artifact@v4
+        with:
+          name: nativx-web-bundle
+          path: dist/
+
+  # ============================================================================
+  # FASE 3: COMPILACIÓN DE APK NATIVO ANDROID (ARM64 + NDK + VULKAN SIN WEBVIEW)
+  # ============================================================================
+  build_android_apk:
+    name: 🤖 3. Compilar Android APK Nativo (ARM64 Vulkan)
+    needs: verify_and_pack_assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust con target aarch64-linux-android
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Configurar Android SDK y NDK r27
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar NDK 27 y cargo-ndk / cargo-apk
+        run: |
+          sdkmanager --install "ndk;27.0.12077973" "platforms;android-35" "build-tools;35.0.0"
+          cargo install cargo-ndk cargo-apk
+
+      - name: Descargar contenedor game_data.nxpak en carpeta assets
+        uses: actions/download-artifact@v4
+        with:
+          name: nativx-assets-pak
+          path: assets/
+
+      - name: Compilar librería nativa C-ABI (.so) ARM64 para Android NDK
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973
+        run: |
+          cargo ndk -t arm64-v8a build -p nx_hal_sensors --release
+          mkdir -p android_out/lib/arm64-v8a
+          cp target/aarch64-linux-android/release/lib*.rlib android_out/ 2>/dev/null || true
+
+      - name: Subir binarios nativos de Android ARM64
+        uses: actions/upload-artifact@v4
+        with:
+          name: nativx-android-arm64
+          path: |
+            target/aarch64-linux-android/release/
+            assets/game_data.nxpak
+
+  # ============================================================================
+  # FASE 4: COMPILACIÓN DE PAQUETE IPA NATIVO PARA APPLE iOS (ARM64 + METAL)
+  # ============================================================================
+  build_ios_ipa:
+    name: 🍏 4. Compilar Apple iOS IPA Nativo (ARM64 Metal)
+    needs: verify_and_pack_assets
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Rust con target aarch64-apple-ios
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Descargar contenedor game_data.nxpak
+        uses: actions/download-artifact@v4
+        with:
+          name: nativx-assets-pak
+          path: Payload/NativXGame.app/assets/
+
+      - name: Compilar binario ARM64 para iOS y ensamblar estructura .ipa
+        run: |
+          cargo build -p nx_hal_sensors -p nx_core -p nx_ecs --target aarch64-apple-ios --release
+          mkdir -p Payload/NativXGame.app
+          cp target/aarch64-apple-ios/release/libnx_hal_sensors.rlib Payload/NativXGame.app/nativx_app
+          if [ -f "Info.plist" ]; then
+            cp Info.plist Payload/NativXGame.app/Info.plist
+          fi
+          zip -r NativXGame_iOS_ARM64.ipa Payload/
+
+      - name: Subir archivo NativXGame_iOS_ARM64.ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: nativx-ios-ipa
+          path: NativXGame_iOS_ARM64.ipa
+
+  # ============================================================================
+  # FASE 5: COMPILACIÓN NATIVA PARA PC (WINDOWS DX12, LINUX VULKAN, MACOS METAL)
+  # ============================================================================
+  build_desktop_matrix:
+    name: 🖥️ 5. Compilar PC Nativo (${{ matrix.os }})
+    needs: verify_and_pack_assets
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: nativx-desktop-linux-x64
+            bin_name: nx_runtime_app
+          - os: windows-latest
+            artifact_name: nativx-desktop-windows-x64
+            bin_name: nx_runtime_app.exe
+          - os: macos-14
+            artifact_name: nativx-desktop-macos-arm64
+            bin_name: nx_runtime_app
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar librerías de sistema en Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libx11-dev libxi-dev libgl1-mesa-dev libasound2-dev libudev-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Descargar contenedor game_data.nxpak
+        uses: actions/download-artifact@v4
+        with:
+          name: nativx-assets-pak
+          path: release_pkg/assets/
+
+      - name: Compilar ejecutable 3D (`nx_runtime_app`) y Servidor Dedicado (`nx_server`)
+        run: |
+          cargo build -p nx_runtime_app -p nx_server -p nx_cli --release
+          cp target/release/${{ matrix.bin_name }} release_pkg/
+
+      - name: Subir ejecutable de Escritorio
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release_pkg/
+
+  # ============================================================================
+  # FASE 6: PUBLICACIÓN AUTOMÁTICA DE LA RELEASE UNIFICADA EN GITHUB
+  # ============================================================================
+  publish_github_release:
+    name: 🚀 6. Publicar Versión Oficial Multi-Plataforma
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build_web_wasm
+      - build_android_apk
+      - build_ios_ipa
+      - build_desktop_matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar todos los binarios compilados (Web, Android, iOS, Windows, Linux, macOS)
+        uses: actions/download-artifact@v4
+        with:
+          path: release_artifacts/
+
+      - name: Comprimir paquetes finales por plataforma
+        run: |
+          cd release_artifacts
+          zip -r NativX_WebGPU_Bundle.zip nativx-web-bundle/
+          zip -r NativX_Android_ARM64.zip nativx-android-arm64/
+          zip -r NativX_Windows_x64.zip nativx-desktop-windows-x64/
+          zip -r NativX_Linux_x64.zip nativx-desktop-linux-x64/
+          zip -r NativX_macOS_ARM64.zip nativx-desktop-macos-arm64/
+          cp nativx-ios-ipa/NativXGame_iOS_ARM64.ipa ./
+
+      - name: Crear GitHub Release con todos los instaladores adjuntos
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release_artifacts/NativX_WebGPU_Bundle.zip
+            release_artifacts/NativX_Android_ARM64.zip
+            release_artifacts/NativXGame_iOS_ARM64.ipa
+            release_artifacts/NativX_Windows_x64.zip
+            release_artifacts/NativX_Linux_x64.zip
+            release_artifacts/NativX_macOS_ARM64.zip

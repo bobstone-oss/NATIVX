@@ -1,0 +1,80 @@
+// Archivo: src/main.nx
+use nx.gpu;
+use nx.device;
+use nx.math.{vec3, vec4, mat4};
+use nx.fs;
+
+// 1. Estructura de datos compartida entre CPU y GPU (Alineación binaria exacta)
+@gpu_shared
+struct EstadoJugador {
+    posicion: vec3,
+    velocidad: vec3,
+    energia: f32,
+}
+
+// 2. Shader de Tarjeta Gráfica escrito directamente en NativX (sin archivos externos)
+@gpu_vertex
+fn proyectar_malla(vertice: vec3, camara: mat4, jugador: EstadoJugador) -> vec4 {
+    let pos_mundo = vertice + jugador.posicion;
+    return camara * vec4(pos_mundo.x, pos_mundo.y, pos_mundo.z, 1.0);
+}
+
+@gpu_fragment
+fn pintar_superficie(uv: vec2, jugador: EstadoJugador) -> vec4 {
+    // Cambia el color en la GPU según la energía del jugador
+    return vec4(1.0 - jugador.energia, jugador.energia, 0.4, 1.0);
+}
+
+// 3. Punto de entrada universal (Arranca igual en APK, iOS IPA y Navegador)
+@entry
+async fn iniciar() {
+    gpu.init(fps_objetivo: 120, vsync: true);
+    device.imu.enable(frecuencia_hz: 120);
+
+    var jugador = EstadoJugador {
+        posicion: vec3(0.0, 0.0, 0.0),
+        velocidad: vec3(0.0, 0.0, 0.0),
+        energia: 1.0,
+    };
+
+    // Carga asíncrona sin bloquear la pantalla (En Web usa Fetch Stream, en Móvil DMA)
+    let nave_malla = await fs.load_mesh("assets/nave_espacial.nxmesh");
+
+    // Bucle principal a 120Hz gestionado por el sistema operativo
+    gpu.on_frame(fn(dt: f32) {
+        actualizar_fisica(&mut jugador, dt);
+        renderizar_escena(&jugador, &nave_malla);
+    });
+}
+
+// 4. Lógica con acceso directo al Hardware del Dispositivo
+fn actualizar_fisica(jugador: &mut EstadoJugador, dt: f32) {
+    // Memoria 'temp': se borra en 0ms al terminar el fotograma sin usar Garbage Collector
+    temp inclinacion = device.imu.gyroscope();
+
+    // Si estamos en PC/Navegador sin giroscopio, NX-HAL mapea automáticamente teclado/gamepad
+    temp entrada = inclinacion.xy + device.input.stick_left();
+
+    jugador.velocidad += vec3(entrada.x, entrada.y, 0.0) * 15.0 * dt;
+    jugador.posicion += jugador.velocidad * dt;
+
+    // Colisión con el borde de la pantalla -> Vibración Háptica Nativa Real
+    if jugador.posicion.x.abs() > 10.0 {
+        jugador.velocidad.x *= -0.8;
+        jugador.energia = (jugador.energia - 0.1).max(0.0);
+
+        // En iOS usa CoreHaptics, en Android NDK Vibrator, en Web Gamepad/Navigator
+        device.haptics.impact(intensidad: 0.9, duracion_ms: 40);
+
+        // Guardado binario instantáneo de progreso (OPFS en Web / mmap en Móvil)
+        fs.write_struct("progreso.bin", jugador);
+    }
+}
+
+fn renderizar_escena(jugador: &EstadoJugador, malla: &Mesh) {
+    gpu.begin_pass(color_fondo: vec4(0.05, 0.05, 0.08, 1.0));
+    gpu.bind_pipeline(proyectar_malla, pintar_superficie);
+    gpu.upload_uniform(jugador);
+    gpu.draw(malla);
+    gpu.end_pass();
+}

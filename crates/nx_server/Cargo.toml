@@ -1,0 +1,12 @@
+# Archivo: crates/nx_server/Cargo.toml
+[package]
+name = "nx_server"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+nx_hal_net = { path = "../nx_hal_net" }
+bytemuck = { version = "1.18", features = ["derive"] }
+tokio = { version = "1.40", features = ["full"] }
+wtransport = "0.5" # Servidor WebTransport/QUIC nativo para clientes Web
+dashmap = "6.1"    # Tabla Hash concurrente sin bloqueos (Lock-Free)

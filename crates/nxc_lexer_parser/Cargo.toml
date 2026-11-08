@@ -1,0 +1,10 @@
+[package]
+name = "nxc_lexer_parser"
+version = "1.2.0"
+edition = "2021"
+
+[dependencies]
+logos = "0.14"
+nx_core = { path = "../nx_core" }
+nx_ecs = { path = "../nx_ecs" }
+bytemuck = { version = "1.18", features = ["derive"] }

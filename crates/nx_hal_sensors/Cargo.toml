@@ -1,0 +1,7 @@
+[package]
+name = "nx_hal_sensors"
+version = "1.2.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib", "cdylib"]

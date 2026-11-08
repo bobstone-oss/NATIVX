@@ -1,0 +1,38 @@
+// Archivo: src/multijugador_espacial.nx
+use nx.{gpu, device, fs, audio, net};
+use nx.math.{vec3, vec4};
+
+@entry
+async fn iniciar_universo() {
+    gpu.init(fps_objetivo: 120, vsync: true);
+    device.imu.enable(frecuencia_hz: 120);
+
+    // Conecta por UDP puro en APK/IPA y por WebTransport QUIC en Navegador
+    let red = await net.connect_unreliable("nx://servidor.odisea.io:4433");
+    let sonido_motor = await fs.load_audio("assets/propulsor_plasma.nxwav");
+    let malla_rival = await fs.load_mesh("assets/caza_estelar.nxmesh");
+
+    var tick_actual: u16 = 0;
+
+    gpu.on_frame(fn(dt: f32) {
+        tick_actual += 1;
+
+        // 1. Lectura Zero-Copy del Giroscopio + Mandos en Arena de Fotograma (0ms GC)
+        temp giro = device.imu.gyroscope();
+        mi_nave.pos += giro * 12.0 * dt;
+
+        // 2. Envío de Datagrama Binario de 32 bytes (UDP / WebTransport)
+        red.send_state(tick: tick_actual, pos: mi_nave.pos, vel: giro);
+
+        // 3. Recepción y Predicción de Rivales + Audio Espacial 3D a 48kHz
+        if let rival = red.poll_latest_rival() {
+            temp pos_predicha = net.predict_position(rival, dt);
+
+            // Posiciona el sonido exactamente en las coordenadas 3D del rival
+            audio.set_listener(pos: mi_nave.pos, right: vec3(1.0, 0.0, 0.0));
+            audio.emit_spatial_3d(sonido_motor, pos: pos_predicha);
+
+            gpu.draw_at(malla_rival, pos: pos_predicha);
+        }
+    });
+}

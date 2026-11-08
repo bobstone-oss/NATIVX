@@ -1,0 +1,63 @@
+{
+  "name": "nativx-language-support",
+  "displayName": "NativX Language & GPU/ECS Tooling",
+  "description": "Soporte oficial para el lenguaje híbrido NativX (.nx): resaltado de sintaxis, autocompletado HAL/ECS, snippets de Shaders WGSL y verificador en tiempo real.",
+  "version": "1.1.0",
+  "publisher": "nativx-foundation",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:nativx"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "nativx",
+        "aliases": [
+          "NativX",
+          "nativx",
+          "nx"
+        ],
+        "extensions": [
+          ".nx",
+          ".nxh"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nativx",
+        "scopeName": "source.nativx",
+        "path": "./syntaxes/nativx.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "nativx",
+        "path": "./snippets/nativx.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "nativx.buildWeb",
+        "title": "NativX: Compilar para Navegador (WebAssembly + WebGPU)"
+      },
+      {
+        "command": "nativx.buildAndroid",
+        "title": "NativX: Compilar APK Nativo (Android NDK + Vulkan)"
+      },
+      {
+        "command": "nativx.packAssets",
+        "title": "NativX: Empaquetar Recursos en Contenedor (.nxpak)"
+      }
+    ]
+  }
+}

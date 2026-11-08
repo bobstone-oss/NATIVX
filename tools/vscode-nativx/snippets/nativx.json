@@ -1,0 +1,63 @@
+{
+  "Punto de Entrada Universal NativX": {
+    "prefix": "nx-entry",
+    "body": [
+      "@entry",
+      "async fn iniciar() {",
+      "    gpu.init(fps_objetivo: 120, vsync: true);",
+      "    device.imu.enable(frecuencia_hz: 120);",
+      "    $0",
+      "}"
+    ],
+    "description": "Crea el punto de entrada universal @entry para APK, IPA y WebGPU"
+  },
+  "Estructura Compartida CPU-GPU": {
+    "prefix": "nx-shared",
+    "body": [
+      "@gpu_shared",
+      "struct ${1:EstadoEscena} {",
+      "    posicion: vec3,",
+      "    energia: f32,",
+      "}"
+    ],
+    "description": "Crea un struct @gpu_shared con alineación automática STD140"
+  },
+  "Par de Shaders Vertex + Fragment": {
+    "prefix": "nx-shader",
+    "body": [
+      "@gpu_vertex",
+      "fn ${1:vs_main}(vertice: vec3, camara: mat4, jugador: ${2:EstadoJugador}) -> vec4 {",
+      "    let pos_mundo = vertice + jugador.posicion;",
+      "    return camara * vec4(pos_mundo.x, pos_mundo.y, pos_mundo.z, 1.0);",
+      "}",
+      "",
+      "@gpu_fragment",
+      "fn ${3:fs_main}(uv: vec2, jugador: ${2:EstadoJugador}) -> vec4 {",
+      "    return vec4(1.0 - jugador.energia, jugador.energia, 0.5, 1.0);",
+      "}"
+    ],
+    "description": "Declara un pipeline de Vertex y Fragment Shader directo en NativX"
+  },
+  "Consulta de Entidades ECS (for query_mut)": {
+    "prefix": "nx-query",
+    "body": [
+      "for (ent, ${1:tr}, ${2:body}) in world.query_mut(${3:LocalTransform}, ${4:RigidBody3D}) {",
+      "    $0",
+      "}"
+    ],
+    "description": "Itera en caché L1 sobre múltiples componentes del motor nx_ecs"
+  },
+  "Sistema ECS NativX": {
+    "prefix": "nx-system",
+    "body": [
+      "@system",
+      "pub fn ${1:nombre_sistema}(world: &mut World, cmds: &mut CommandBuffer, dt: f32) {",
+      "    temp giro = device.imu.gyroscope();",
+      "    $0",
+      "    world.step_physics(vec3(0.0, -9.81, 0.0), dt);",
+      "    world.propagate_transforms();",
+      "}"
+    ],
+    "description": "Crea un sistema @system con lectura de giroscopio en FrameArena y paso físico"
+  }
+}

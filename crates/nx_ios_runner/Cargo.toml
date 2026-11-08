@@ -1,0 +1,17 @@
+# Archivo: crates/nx_ios_runner/Cargo.toml
+[package]
+name = "nativx_ios"
+version = "1.0.0"
+edition = "2021"
+
+[lib]
+name = "nativx_app"
+crate-type = ["staticlib"]
+
+[dependencies]
+nx_hal_gpu = { path = "../nx_hal_gpu" }
+nx_hal_sensors = { path = "../nx_hal_sensors" }
+winit = { version = "0.30", features = ["ios"] }
+block2 = "0.5"
+objc2 = "0.5"
+pollster = "0.3"

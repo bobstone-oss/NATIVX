@@ -1,0 +1,18 @@
+[package]
+name = "nx_runtime_app"
+version = "1.2.0"
+edition = "2021"
+build = "build.rs"
+
+[dependencies]
+nx_core = { path = "../nx_core" }
+nx_ecs = { path = "../nx_ecs" }
+nx_hal_sensors = { path = "../nx_hal_sensors" }
+nx_hal_fs = { path = "../nx_hal_fs" }
+wgpu = "22.1"
+winit = "0.30"
+pollster = "0.3"
+bytemuck = { version = "1.18", features = ["derive"] }
+
+[build-dependencies]
+nxc_lexer_parser = { path = "../nxc_lexer_parser" }

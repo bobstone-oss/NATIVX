@@ -1,0 +1,80 @@
+use nx.ecs;
+use nx.device;
+
+@component
+struct OrbitaAsteroide {
+    velocidad_giro: f32,
+    energia_escudo: f32,
+}
+
+@system
+pub fn poblar_universo_3d(world: &mut World) -> EntityId {
+    let nodriza = world.spawn_spatial(LocalTransform.from_xyz(0.0, 0.0, 0.0));
+    world.insert(nodriza, RigidBody3D.dynamic_with_mass(100.0));
+    world.insert(nodriza, ColliderAabb.new(1.2, 1.2, 1.2));
+    world.insert(nodriza, MeshRender {
+        mesh_asset_id: 0,
+        material_id: 0,
+        base_color: vec4(0.0, 0.94, 1.0, 1.0),
+        visible: 1,
+    });
+
+    let satelite_izq = world.spawn_spatial(LocalTransform.from_xyz(-2.8, 0.5, 0.0));
+    world.insert(satelite_izq, MeshRender {
+        mesh_asset_id: 0,
+        material_id: 0,
+        base_color: vec4(1.0, 0.35, 0.1, 1.0),
+        visible: 1,
+    });
+    world.set_parent(satelite_izq, nodriza);
+
+    let satelite_der = world.spawn_spatial(LocalTransform.from_xyz(2.8, -0.5, 0.0));
+    world.insert(satelite_der, MeshRender {
+        mesh_asset_id: 0,
+        material_id: 0,
+        base_color: vec4(0.2, 1.0, 0.4, 1.0),
+        visible: 1,
+    });
+    world.set_parent(satelite_der, nodriza);
+
+    var offsets: [f32; 6] = [-6.0, -4.0, -2.0, 2.0, 4.0, 6.0];
+    for i in 0..6 {
+        let x_ini = offsets[i];
+        let sonda = world.spawn_spatial(LocalTransform.from_xyz(x_ini, 4.2, 0.0));
+        world.insert(sonda, RigidBody3D.dynamic_with_mass(5.0));
+        world.insert(sonda, ColliderAabb.new(0.65, 0.65, 0.65));
+        world.insert(sonda, MeshRender {
+            mesh_asset_id: 0,
+            material_id: 0,
+            base_color: vec4(0.75, 0.25, 1.0, 1.0),
+            visible: 1,
+        });
+    }
+
+    return nodriza;
+}
+
+@system
+pub fn actualizar_universo_ecs(world: &mut World, nodriza: EntityId, input_dir: vec3, dt: f32) {
+    temp giro = device.imu.gyroscope();
+    temp empuje = (input_dir + giro) * 18.0;
+
+    for (ent, tr, body) in world.query_mut(LocalTransform, RigidBody3D) {
+        if ent == nodriza {
+            body.apply_force(empuje * 40.0);
+            body.angular_velocity = vec3(0.4, 1.2, 0.2);
+        } else {
+            let hacia_centro = -tr.position * 6.0;
+            body.apply_force(hacia_centro);
+            body.angular_velocity = vec3(1.5, 2.0, 0.5);
+        }
+
+        if tr.position.x > 8.5 { tr.position.x = 8.5; body.velocity.x *= -0.9; }
+        if tr.position.x < -8.5 { tr.position.x = -8.5; body.velocity.x *= -0.9; }
+        if tr.position.y > 5.0 { tr.position.y = 5.0; body.velocity.y *= -0.9; }
+        if tr.position.y < -5.0 { tr.position.y = -5.0; body.velocity.y *= -0.9; }
+    }
+
+    world.step_physics(vec3(0.0, -1.5, 0.0), dt);
+    world.propagate_transforms();
+}

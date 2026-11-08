@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "crates/nx_core",
+    "crates/nx_hal_sensors",
+    "crates/nx_hal_fs",
+    "crates/nx_hal_audio",
+    "crates/nx_hal_net",
+    "crates/nx_hal_ble",
+    "crates/nx_hal_store",
+    "crates/nx_hal_ui",
+    "crates/nx_hal_gpu",
+    "crates/nx_server",
+    "crates/nx_ecs",
+    "crates/nxc_lexer_parser",
+    "crates/nx_cli",
+    "crates/nx_runtime_app"
+]
+resolver = "2"

@@ -1,0 +1,8 @@
+# Archivo: crates/nx_hal_store/Cargo.toml
+[package]
+name = "nx_hal_store"
+version = "1.0.0"
+edition = "2021"
+
+[dependencies]
+nx_core = { path = "../nx_core" }

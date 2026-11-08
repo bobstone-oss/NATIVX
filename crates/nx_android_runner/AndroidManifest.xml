@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.nativx.runtime"
+    android:versionCode="1"
+    android:versionName="1.0.0">
+
+    <!-- SDK Mínimo 29 (Android 10+) para soporte nativo completo de Vulkan y AAudio -->
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="35" />
+
+    <!-- Permisos de Hardware Directo (Haptics, Sensores a 200Hz y Red UDP/QUIC) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Exigir GPU compatible con Vulkan 1.1+ y Giroscopio físico -->
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="1" android:required="true" />
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x401000" android:required="true" />
+    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="true" />
+
+    <!-- hasCode="false" elimina la necesidad de clases Java/DEX: el APK es 100% binario C++/Rust -->
+    <application
+        android:label="NativX Game"
+        android:hasCode="false"
+        android:debuggable="false"
+        android:allowBackup="false">
+
+        <activity
+            android:name="android.app.NativeActivity"
+            android:label="NativX Game"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <!-- Nombre exacto del binario .so generado por NativX (libnativx_app.so) -->
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="nativx_app" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
