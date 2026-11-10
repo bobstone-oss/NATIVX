@@ -25,7 +25,10 @@
     <div id="nx-status">Inicializando bus WebGPU + Wasm...</div>
     <button id="nx-start" hidden>INICIAR HARDWARE NATIVX</button>
   </div>
-  <canvas id="nx-surface" tabindex="0"></canvas>
+    <canvas id="nx-surface" tabindex="0"></canvas>
+  <div id="nx-gameplay-preview" style="position:fixed;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;">
+    <img src="./gameplay.png" style="width:100vw;height:100vh;object-fit:cover;" alt="Gameplay 3D"/>
+  </div>
   <script type="module" src="./nx_loader.js"></script>
 </body>
 </html>
